@@ -1,9 +1,16 @@
 /**
- * Public surface of the SDK. Construct one `CrowdyClient` per session and
- * access everything via the typed sub-clients (`client.auth`, `client.udp`,
- * `client.orgs`, ...). The legacy `client.login()` / `client.sendActorUpdate`
- * shortcuts are gone - use `client.auth.login()` / `client.udp.sendActorUpdate()`
- * instead.
+ * Public surface of the SDK. Construct one `CrowdyClient` per game session.
+ *
+ * **As of the management/game-api split**, CrowdyJS is **game-only**. The
+ * management sub-clients (`auth`, `users`, `orgs`, `apps`, `appAccess`,
+ * `billing`, `quotas`, `payments`) used to live here too; they're gone.
+ * Consumers that need login, registration, org / app management, or
+ * billing should call the `cks-management-api` REST/GraphQL surface
+ * directly (e.g. `POST /auth/login` to mint a `game_tokens` row, then
+ * pass the resulting Bearer token here via {@link CrowdyClient.setToken}).
+ *
+ * The remaining sub-clients (`udp`, `chunks`, `voxels`, `actors`,
+ * `teleport`, `state`, `serverStatus`) all target `cks-game-api`.
  */
 
 import { AuthState } from './auth-state.js';
@@ -13,14 +20,6 @@ import type { CrowdyLogger } from './logger.js';
 import type { TokenStore } from './session.js';
 import { WorldClient } from './world.js';
 
-import { AuthAPI } from './domains/auth.js';
-import { UsersAPI } from './domains/users.js';
-import { OrganizationsAPI } from './domains/organizations.js';
-import { AppsAPI } from './domains/apps.js';
-import { AppAccessAPI } from './domains/appAccess.js';
-import { BillingAPI } from './domains/billing.js';
-import { QuotasAPI } from './domains/quotas.js';
-import { PaymentsAPI } from './domains/payments.js';
 import { ChunksAPI } from './domains/chunks.js';
 import { VoxelsAPI } from './domains/voxels.js';
 import { ActorsAPI } from './domains/actors.js';
@@ -30,9 +29,13 @@ import { ServerStatusAPI } from './domains/serverStatus.js';
 import { UdpAPI } from './domains/udp.js';
 
 export interface CrowdyClientConfig {
+  /** Game-api HTTP URL (root). Defaults to local game-api dev URL. */
   httpUrl?: string;
+  /** Game-api WS URL for subscriptions. */
   wsUrl?: string;
+  /** Game-api GraphQL endpoint. Defaults to `${httpUrl}/graphql`. */
   graphqlEndpoint?: string;
+  /** Game-api WS endpoint. Defaults to `${wsUrl}/graphql`. */
   wsEndpoint?: string;
   timeout?: number;
   tokenStore?: TokenStore;
@@ -46,21 +49,11 @@ export interface CrowdyClientConfig {
 }
 
 export class CrowdyClient {
-  // Internal infrastructure (kept private; tests can poke via the auth
-  // sub-client's `setToken` / `getToken` for token rehydration).
   readonly session: AuthState;
   readonly graphql: GraphQLClient;
   readonly realtime: SubscriptionManager;
 
-  // Domain wrappers - the canonical surface area.
-  readonly auth: AuthAPI;
-  readonly users: UsersAPI;
-  readonly orgs: OrganizationsAPI;
-  readonly apps: AppsAPI;
-  readonly appAccess: AppAccessAPI;
-  readonly billing: BillingAPI;
-  readonly quotas: QuotasAPI;
-  readonly payments: PaymentsAPI;
+  // Game-only sub-clients.
   readonly chunks: ChunksAPI;
   readonly voxels: VoxelsAPI;
   readonly actors: ActorsAPI;
@@ -90,14 +83,6 @@ export class CrowdyClient {
       this.session,
     );
 
-    this.auth = new AuthAPI(this.graphql, this.session);
-    this.users = new UsersAPI(this.graphql);
-    this.orgs = new OrganizationsAPI(this.graphql);
-    this.apps = new AppsAPI(this.graphql);
-    this.appAccess = new AppAccessAPI(this.graphql);
-    this.billing = new BillingAPI(this.graphql);
-    this.quotas = new QuotasAPI(this.graphql);
-    this.payments = new PaymentsAPI(this.graphql);
     this.chunks = new ChunksAPI(this.graphql);
     this.voxels = new VoxelsAPI(this.graphql);
     this.actors = new ActorsAPI(this.graphql);
@@ -105,6 +90,19 @@ export class CrowdyClient {
     this.state = new StateAPI(this.graphql);
     this.serverStatus = new ServerStatusAPI(this.graphql);
     this.udp = new UdpAPI(this.graphql, this.realtime);
+  }
+
+  /**
+   * Set the Bearer token (typically obtained from
+   * `POST /auth/login` against `cks-management-api`).
+   */
+  setToken(token: string | null): void {
+    this.session.setToken(token);
+  }
+
+  /** Read the current Bearer token (null if no session). */
+  getToken(): string | null {
+    return this.session.getToken();
   }
 
   world(appId: string): WorldClient {

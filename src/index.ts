@@ -1,19 +1,24 @@
 /**
- * CrowdyJS SDK - Client SDK for Crowded Kingdoms GraphQL API.
+ * CrowdyJS SDK - game-only client SDK for Crowded Kingdoms.
+ *
+ * As of the management/game-api split, this package targets
+ * `cks-game-api` only. For login / registration / org / app / billing /
+ * payments, consumers should call `cks-management-api` directly
+ * (e.g. `POST /auth/login`) and then pass the resulting Bearer token to
+ * this SDK via {@link CrowdyClient.setToken}.
  *
  * Usage:
  *
  *   import { CrowdyClient } from '@crowdedkingdomstudios/crowdyjs';
  *
+ *   // Log in against the management API yourself, then:
  *   const client = new CrowdyClient({ graphqlEndpoint, wsEndpoint });
- *   const { token } = await client.auth.login({ email, password });
- *   const me = await client.users.me();
- *   const myOrgs = await client.orgs.myOrganizations();
- *   const checkout = await client.payments.createCheckout({ ... });
+ *   client.setToken(token);
+ *
  *   const unsub = client.udp.subscribe({ onActorUpdate: (n) => { ... } });
  */
 
-export const VERSION = '3.0.0';
+export const VERSION = '4.0.0-game-only';
 
 export {
   CrowdyClient,
@@ -91,17 +96,8 @@ export type {
 export { UdpErrorCode } from './types.js';
 
 // -----------------------------------------------------------------------------
-// Domain wrappers (exported so consumers can reference the API surface in
-// their own type annotations).
+// Game-only domain wrappers.
 // -----------------------------------------------------------------------------
-export { AuthAPI } from './domains/auth.js';
-export { UsersAPI } from './domains/users.js';
-export { OrganizationsAPI } from './domains/organizations.js';
-export { AppsAPI } from './domains/apps.js';
-export { AppAccessAPI } from './domains/appAccess.js';
-export { BillingAPI } from './domains/billing.js';
-export { QuotasAPI } from './domains/quotas.js';
-export { PaymentsAPI } from './domains/payments.js';
 export { ChunksAPI } from './domains/chunks.js';
 export { VoxelsAPI } from './domains/voxels.js';
 export { ActorsAPI } from './domains/actors.js';
@@ -111,13 +107,11 @@ export { ServerStatusAPI } from './domains/serverStatus.js';
 export { UdpAPI } from './domains/udp.js';
 
 // -----------------------------------------------------------------------------
-// Re-export schema-derived input/output types and enums from codegen.
-// Consumers can `import type { CreateOrganizationInput } from '@crowdedkingdomstudios/crowdyjs'`
-// and get the schema's input shape.
+// Re-export schema-derived game-side input/output types and enums from
+// codegen. Run `npm run codegen` against `cks-game-api/schema.gql` after
+// schema changes; the management-side types are no longer included.
 // -----------------------------------------------------------------------------
 export type {
-  // UDP / replication input shapes (now sourced from codegen so BigInt
-  // fields are typed `string` and match the wire format).
   ChunkCoordinatesInput,
   VoxelCoordinatesInput,
   ActorUpdateRequestInput,
@@ -129,25 +123,6 @@ export type {
   RealtimeConnectionEvent,
   GameClientBootstrap,
 
-  // Inputs
-  LoginUserInput,
-  RegisterUserInput,
-  ResetPasswordInput,
-  CreateOrganizationInput,
-  CreateOrgTokenInput,
-  UpdateOrgTokenInput,
-  CreateOrgRoleInput,
-  UpdateOrgRoleInput,
-  InviteOrgMemberInput,
-  CreateAppInput,
-  UpdateAppInput,
-  AppMarketplaceFilterInput,
-  CreateAccessTierInput,
-  UpdateAccessTierInput,
-  GrantAppAccessInput,
-  CreateCheckoutInput,
-  CheckoutFilterInput,
-  SetQuotaInput,
   CreateActorInput,
   UpdateActorInput,
   ActorFilterInput,
@@ -172,23 +147,6 @@ export type {
   LodDataInput,
   VoxelStateInput,
 
-  // Outputs
-  Organization,
-  OrgMember,
-  OrgRole,
-  OrgToken,
-  OrgPermission,
-  OrgMembership,
-  App,
-  AppsPage,
-  AppAccessTier,
-  AppUserAccess,
-  AppBudget,
-  OrgWallet,
-  WalletTransaction,
-  Checkout,
-  CheckoutsPage,
-  ServiceQuota,
   Chunk,
   ChunkLodsResponse,
   ChunksByDistanceResponse,
@@ -208,19 +166,9 @@ export type {
   ServerVersionInfo,
   VersionInfo,
   PageInfo,
-  UsersPage,
   UdpNotificationsSubscription,
 
-  // Scalars passthrough
   Scalars,
 } from './generated/graphql.js';
 
-// Re-export schema enums as values (so consumers can switch on them).
-export {
-  PaymentProvider,
-  CheckoutPurpose,
-  CheckoutStatus,
-  AppVisibility,
-  AppStatus,
-  ServerState,
-} from './generated/graphql.js';
+export { ServerState } from './generated/graphql.js';
