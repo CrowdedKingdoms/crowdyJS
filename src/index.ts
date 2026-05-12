@@ -1,24 +1,39 @@
 /**
- * CrowdyJS SDK - game-only client SDK for Crowded Kingdoms.
+ * CrowdyJS SDK — client SDK for Crowded Kingdoms.
  *
- * As of the management/game-api split, this package targets
- * `cks-game-api` only. For login / registration / org / app / billing /
- * payments, consumers should call `cks-management-api` directly
- * (e.g. `POST /auth/login`) and then pass the resulting Bearer token to
- * this SDK via {@link CrowdyClient.setToken}.
+ * As of the management/game-api split, the SDK targets **two** GraphQL
+ * endpoints behind a single `CrowdyClient`:
+ *
+ *   - `cks-management-api` for identity (`client.auth`, `client.users`).
+ *     This is where `game_tokens` get minted.
+ *   - `cks-game-api` for everything game-side (`client.chunks`,
+ *     `client.voxels`, `client.actors`, `client.teleport`, `client.state`,
+ *     `client.serverStatus`, `client.udp`).
+ *
+ * Both clients share a single `AuthState` so the token returned by
+ * `client.auth.login()` is automatically attached to every subsequent
+ * request, regardless of which endpoint serves it.
  *
  * Usage:
  *
  *   import { CrowdyClient } from '@crowdedkingdomstudios/crowdyjs';
  *
- *   // Log in against the management API yourself, then:
- *   const client = new CrowdyClient({ graphqlEndpoint, wsEndpoint });
- *   client.setToken(token);
+ *   const client = new CrowdyClient({
+ *     httpUrl: 'https://dev-game-api.crowdedkingdoms.com',
+ *     wsUrl:   'wss://dev-game-api.crowdedkingdoms.com',
+ *     managementUrl: 'https://dev-management-api.crowdedkingdoms.com',
+ *   });
  *
+ *   const { token, user } = await client.auth.login({ email, password });
+ *   const me = await client.users.me();
  *   const unsub = client.udp.subscribe({ onActorUpdate: (n) => { ... } });
+ *
+ * Org / app / billing / payments / quotas operations are not in this
+ * package; consume `cks-management-api` directly (the management UI does)
+ * via Apollo, fetch, or a separate codegen client.
  */
 
-export const VERSION = '4.0.0-game-only';
+export const VERSION = '4.0.0';
 
 export {
   CrowdyClient,
@@ -96,8 +111,11 @@ export type {
 export { UdpErrorCode } from './types.js';
 
 // -----------------------------------------------------------------------------
-// Game-only domain wrappers.
+// Domain wrappers.
+// AuthAPI / UsersAPI target cks-management-api; the rest target cks-game-api.
 // -----------------------------------------------------------------------------
+export { AuthAPI } from './domains/auth.js';
+export { UsersAPI } from './domains/users.js';
 export { ChunksAPI } from './domains/chunks.js';
 export { VoxelsAPI } from './domains/voxels.js';
 export { ActorsAPI } from './domains/actors.js';
@@ -122,6 +140,12 @@ export type {
   UdpProxyConnectionStatus,
   RealtimeConnectionEvent,
   GameClientBootstrap,
+
+  // Management-api auth surface (used by AuthAPI / UsersAPI).
+  LoginUserInput,
+  RegisterUserInput,
+  ResetPasswordInput,
+  UpdateGamertagInput,
 
   CreateActorInput,
   UpdateActorInput,

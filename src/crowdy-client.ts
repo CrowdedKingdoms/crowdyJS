@@ -1,16 +1,24 @@
 /**
- * Public surface of the SDK. Construct one `CrowdyClient` per game session.
+ * Public surface of the SDK. Construct one `CrowdyClient` per session and
+ * access everything via the typed sub-clients (`client.auth`, `client.udp`,
+ * `client.chunks`, ...).
  *
- * **As of the management/game-api split**, CrowdyJS is **game-only**. The
- * management sub-clients (`auth`, `users`, `orgs`, `apps`, `appAccess`,
- * `billing`, `quotas`, `payments`) used to live here too; they're gone.
- * Consumers that need login, registration, org / app management, or
- * billing should call the `cks-management-api` REST/GraphQL surface
- * directly (e.g. `POST /auth/login` to mint a `game_tokens` row, then
- * pass the resulting Bearer token here via {@link CrowdyClient.setToken}).
+ * The management/game-api split means CrowdyJS now talks to **two** GraphQL
+ * endpoints behind the scenes:
  *
- * The remaining sub-clients (`udp`, `chunks`, `voxels`, `actors`,
- * `teleport`, `state`, `serverStatus`) all target `cks-game-api`.
+ *   - `managementUrl` / `managementGraphqlEndpoint` -> `cks-management-api`
+ *     used by `auth` (login, register, logout, password / email flows) and
+ *     `users` (me, updateGamertag, deleteMyAccount). This is also where
+ *     `game_tokens` are minted.
+ *
+ *   - `httpUrl` / `graphqlEndpoint` -> `cks-game-api`
+ *     used by every game / world / replication sub-client
+ *     (`chunks`, `voxels`, `actors`, `teleport`, `state`, `serverStatus`,
+ *     `udp`). WebSocket subscriptions (`wsUrl`) also target this endpoint.
+ *
+ * A single `AuthState` is shared across both clients, so once
+ * `client.auth.login()` returns, every subsequent SDK call (against either
+ * endpoint) carries the Bearer token automatically.
  */
 
 import { AuthState } from './auth-state.js';
@@ -20,6 +28,8 @@ import type { CrowdyLogger } from './logger.js';
 import type { TokenStore } from './session.js';
 import { WorldClient } from './world.js';
 
+import { AuthAPI } from './domains/auth.js';
+import { UsersAPI } from './domains/users.js';
 import { ChunksAPI } from './domains/chunks.js';
 import { VoxelsAPI } from './domains/voxels.js';
 import { ActorsAPI } from './domains/actors.js';
@@ -29,14 +39,29 @@ import { ServerStatusAPI } from './domains/serverStatus.js';
 import { UdpAPI } from './domains/udp.js';
 
 export interface CrowdyClientConfig {
-  /** Game-api HTTP URL (root). Defaults to local game-api dev URL. */
+  // ----- Game API (default endpoint) -----
+  /** game-api HTTP root (e.g. `https://dev-game-api.crowdedkingdoms.com`). */
   httpUrl?: string;
-  /** Game-api WS URL for subscriptions. */
+  /** game-api WS root. */
   wsUrl?: string;
-  /** Game-api GraphQL endpoint. Defaults to `${httpUrl}/graphql`. */
+  /** game-api GraphQL endpoint. Defaults to `${httpUrl}/graphql`. */
   graphqlEndpoint?: string;
-  /** Game-api WS endpoint. Defaults to `${wsUrl}/graphql`. */
+  /** game-api WS endpoint. Defaults to `${wsUrl}/graphql`. */
   wsEndpoint?: string;
+
+  // ----- Management API (auth + identity) -----
+  /**
+   * management-api HTTP root (e.g.
+   * `https://dev-management-api.crowdedkingdoms.com`). When set,
+   * `client.auth` and `client.users` route here. If left empty the SDK
+   * falls back to `httpUrl` for backwards-compatibility with the legacy
+   * single-endpoint deployment, but new code should set this explicitly.
+   */
+  managementUrl?: string;
+  /** management-api GraphQL endpoint. Defaults to `${managementUrl}/graphql`. */
+  managementGraphqlEndpoint?: string;
+
+  // ----- Common -----
   timeout?: number;
   tokenStore?: TokenStore;
   logger?: CrowdyLogger;
@@ -49,11 +74,20 @@ export interface CrowdyClientConfig {
 }
 
 export class CrowdyClient {
+  /** Shared token state for both game-api and management-api requests. */
   readonly session: AuthState;
+  /** game-api HTTP client. */
   readonly graphql: GraphQLClient;
+  /** game-api WebSocket subscription manager. */
   readonly realtime: SubscriptionManager;
+  /** management-api HTTP client. Same `AuthState` as `graphql`. */
+  readonly management: GraphQLClient;
 
-  // Game-only sub-clients.
+  // Identity (management-api).
+  readonly auth: AuthAPI;
+  readonly users: UsersAPI;
+
+  // Game (game-api).
   readonly chunks: ChunksAPI;
   readonly voxels: VoxelsAPI;
   readonly actors: ActorsAPI;
@@ -64,6 +98,7 @@ export class CrowdyClient {
 
   constructor(config: CrowdyClientConfig = {}) {
     this.session = new AuthState(config.tokenStore);
+
     this.graphql = new GraphQLClient(
       {
         httpUrl: config.httpUrl,
@@ -73,6 +108,7 @@ export class CrowdyClient {
       },
       this.session,
     );
+
     this.realtime = new SubscriptionManager(
       {
         wsUrl: config.wsUrl,
@@ -83,6 +119,22 @@ export class CrowdyClient {
       this.session,
     );
 
+    // Management-api client. Falls back to game-api endpoint if the caller
+    // hasn't configured `managementUrl` yet (single-endpoint legacy mode).
+    this.management = new GraphQLClient(
+      {
+        httpUrl: config.managementUrl ?? config.httpUrl,
+        graphqlEndpoint:
+          config.managementGraphqlEndpoint ?? config.graphqlEndpoint,
+        timeout: config.timeout,
+        logger: config.logger,
+      },
+      this.session,
+    );
+
+    this.auth = new AuthAPI(this.management, this.session);
+    this.users = new UsersAPI(this.management);
+
     this.chunks = new ChunksAPI(this.graphql);
     this.voxels = new VoxelsAPI(this.graphql);
     this.actors = new ActorsAPI(this.graphql);
@@ -92,10 +144,7 @@ export class CrowdyClient {
     this.udp = new UdpAPI(this.graphql, this.realtime);
   }
 
-  /**
-   * Set the Bearer token (typically obtained from
-   * `POST /auth/login` against `cks-management-api`).
-   */
+  /** Imperatively set the Bearer token (useful for SSO / token rehydrate). */
   setToken(token: string | null): void {
     this.session.setToken(token);
   }
@@ -116,6 +165,8 @@ export class CrowdyClient {
   }
 }
 
-export function createCrowdyClient(config: CrowdyClientConfig = {}): CrowdyClient {
+export function createCrowdyClient(
+  config: CrowdyClientConfig = {},
+): CrowdyClient {
   return new CrowdyClient(config);
 }
