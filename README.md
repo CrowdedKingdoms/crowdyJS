@@ -1,8 +1,8 @@
 # CrowdyJS SDK
 
-Browser-first SDK for Crowded Kingdoms game clients. CrowdyJS wraps the GraphQL
-API, the UDP proxy subscription, auth/session state, and spatial send helpers in
-one typed client.
+Browser-first SDK for Crowded Kingdoms game clients. CrowdyJS wraps the
+`cks-management-api` identity surface and the `cks-game-api` world / UDP-proxy
+surface behind one typed client with a single shared `AuthState`.
 
 ## Install
 
@@ -10,9 +10,22 @@ one typed client.
 npm install @crowdedkingdomstudios/crowdyjs
 ```
 
-CrowdyJS v3 targets browsers by default and uses native `fetch`, `WebSocket`,
+CrowdyJS v4 targets browsers by default and uses native `fetch`, `WebSocket`,
 `crypto`, `btoa`, and `atob`. Node tools can still use the SDK, but must provide
 browser-compatible globals when they open realtime connections.
+
+## Two-endpoint architecture
+
+After the management/game-api split the SDK fans out to two GraphQL servers:
+
+| sub-client | targets | use |
+|---|---|---|
+| `client.auth`, `client.users` | **cks-management-api** (`managementUrl`) | login / register / logout / password / email / `me` / `updateGamertag` — anything that mints or reads identity. |
+| `client.chunks`, `client.voxels`, `client.actors`, `client.teleport`, `client.state`, `client.serverStatus`, `client.udp` | **cks-game-api** (`httpUrl` / `wsUrl`) | world data, UDP proxy subscriptions, the game-client bootstrap. |
+
+Both endpoints share a single `AuthState`, so once `client.auth.login()` returns,
+every subsequent SDK call (against either endpoint) carries the Bearer token
+automatically.
 
 ## Quick Start
 
@@ -23,8 +36,11 @@ import {
 } from '@crowdedkingdomstudios/crowdyjs';
 
 const client = createCrowdyClient({
-  httpUrl: 'https://api.example.com/graphql',
-  wsUrl: 'wss://api.example.com/graphql',
+  // game-api
+  httpUrl: 'https://dev-game-api.crowdedkingdoms.com',
+  wsUrl: 'wss://dev-game-api.crowdedkingdoms.com',
+  // management-api (login, register, me, ...)
+  managementUrl: 'https://dev-management-api.crowdedkingdoms.com',
   tokenStore: new BrowserLocalStorageTokenStore(),
   realtime: {
     retryAttempts: 8,
@@ -41,6 +57,10 @@ if (!client.session.getToken()) {
 const bootstrap = await client.serverStatus.gameClientBootstrap('1');
 console.log(bootstrap.versionInfo.minimumClientVersion);
 ```
+
+If `managementUrl` is omitted, the SDK falls back to `httpUrl` for
+backwards-compat with the legacy single-endpoint deployment. New code should
+always set it explicitly.
 
 ## Game Loop Lifecycle
 
@@ -140,8 +160,10 @@ import { VersionInfoDocument } from '@crowdedkingdomstudios/crowdyjs/generated';
 const data = await client.graphql.request(VersionInfoDocument);
 ```
 
-Most consumers should prefer the methods on `client.auth`, `client.udp`,
-`client.serverStatus`, `client.users`, `client.apps`, and `client.world()`.
+Most consumers should prefer the methods on `client.auth`, `client.users`,
+`client.udp`, `client.serverStatus`, and `client.world()`. Org / app / billing /
+payments / quotas operations are not in the SDK; consume `cks-management-api`
+directly (the management UI does, via Apollo).
 
 ## Development
 
@@ -152,6 +174,16 @@ npm run build
 npm test
 ```
 
-`npm run codegen` syncs `../cks-graphql-api/schema.gql` when the API repo is
-checked out beside this SDK. `npm run check:schema` fails if the committed SDL or
-generated types drift from the API schema.
+`npm run codegen` reads `./schema.gql`, which after the split should be the
+**union** of `cks-management-api/schema.gql` (for `client.auth` / `client.users`
+operation types) and `cks-game-api/schema.gql` (for every other sub-client).
+Until a proper merge tool is wired in, the workflow is:
+
+```bash
+cat ../cks-management-api/schema.gql ../cks-game-api/schema.gql > schema.gql
+# de-dupe shared scalar / enum definitions by hand or via a merge tool
+npm run codegen
+```
+
+`npm run check:schema` fails if the committed SDL or generated types drift from
+the schema.
