@@ -112,10 +112,12 @@ export { UdpErrorCode } from './types.js';
 
 // -----------------------------------------------------------------------------
 // Domain wrappers.
-// AuthAPI / UsersAPI target cks-management-api; the rest target cks-game-api.
+// AuthAPI / UsersAPI / AppsAPI target cks-management-api; the rest target
+// cks-game-api.
 // -----------------------------------------------------------------------------
 export { AuthAPI } from './domains/auth.js';
 export { UsersAPI } from './domains/users.js';
+export { AppsAPI, type AppRoute } from './domains/apps.js';
 export { ChunksAPI } from './domains/chunks.js';
 export { VoxelsAPI } from './domains/voxels.js';
 export { ActorsAPI } from './domains/actors.js';
@@ -155,7 +157,6 @@ export type {
   UpdateUserStateInput,
   UpdateAvatarStateInput,
   UpdateActorStateInput,
-  UpdateGamertagInput,
   UpdateChunkStateInput,
   UpdateChunkLodsInput,
   ChunkUpdateInput,

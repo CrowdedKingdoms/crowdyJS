@@ -13,6 +13,8 @@ query MarketplaceApps(
       visibility
       status
       metadata
+      splitMode
+      gameApiUrl
       createdAt
       updatedAt
       org {

@@ -21,18 +21,11 @@ import {
   RequestPasswordResetDocument,
   ResendConfirmationEmailDocument,
   ResetPasswordDocument,
-  type ChangePasswordMutation,
-  type ConfirmEmailMutation,
   type LoginMutation,
-  type LogoutAllDevicesMutation,
-  type LogoutMutation,
   type LoginUserInput,
   type RegisterMutation,
   type RegisterUserInput,
-  type RequestPasswordResetMutation,
-  type ResendConfirmationEmailMutation,
   type ResetPasswordInput,
-  type ResetPasswordMutation,
 } from '../generated/graphql.js';
 
 export class AuthAPI {
@@ -93,11 +86,9 @@ export class AuthAPI {
     return data.requestPasswordReset;
   }
 
-  async resetPassword(
-    resetPasswordInput: ResetPasswordInput,
-  ): Promise<boolean> {
+  async resetPassword(input: ResetPasswordInput): Promise<boolean> {
     const data = await this.graphql.request(ResetPasswordDocument, {
-      resetPasswordInput,
+      input,
     });
     return data.resetPassword;
   }

@@ -27,6 +27,33 @@ Both endpoints share a single `AuthState`, so once `client.auth.login()` returns
 every subsequent SDK call (against either endpoint) carries the Bearer token
 automatically.
 
+### Per-app routing in split mode
+
+After the greenfield-only DB split (see
+[`/db-split-decisions.md`](../db-split-decisions.md)) each split-mode app
+lives behind its own `cks-game-api` deployment with its own URL. Apps return
+a new `gameApiUrl` field on the management API:
+
+```graphql
+query AppForRouting($id: BigInt!) {
+  app(id: $id) {
+    appId
+    splitMode
+    gameApiUrl
+  }
+}
+```
+
+Clients should:
+
+1. Build a `CrowdyClient` against the management URL only (no `httpUrl`).
+2. Query `app(id: ...)` for the app the player is about to play.
+3. If `splitMode && gameApiUrl`, construct a **second** `CrowdyClient` with
+   `httpUrl: gameApiUrl` (and the matching `wsUrl`) **sharing the same
+   `tokenStore`**, then drive gameplay through that client. Pre-split apps
+   (`splitMode === false`) keep working against the legacy single
+   deployment URL.
+
 ## Quick Start
 
 ```ts

@@ -31,38 +31,12 @@ export interface VoxelCoordinatesInput {
   z: number;
 }
 
-// Error codes
-export enum UdpErrorCode {
-  NO_ERROR = 'NO_ERROR',
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
-  EMAIL_NOT_FOUND = 'EMAIL_NOT_FOUND',
-  BAD_PASSWORD = 'BAD_PASSWORD',
-  EMAIL_ALREADY_EXISTS = 'EMAIL_ALREADY_EXISTS',
-  INVALID_TOKEN = 'INVALID_TOKEN',
-  APP_NOT_FOUND = 'APP_NOT_FOUND',
-  UNAUTHORIZED = 'UNAUTHORIZED',
-  APP_NOT_LOADED = 'APP_NOT_LOADED',
-  EMAIL_TOO_SHORT = 'EMAIL_TOO_SHORT',
-  EMAIL_TOO_LONG = 'EMAIL_TOO_LONG',
-  PASSWORD_TOO_SHORT = 'PASSWORD_TOO_SHORT',
-  PASSWORD_TOO_LONG = 'PASSWORD_TOO_LONG',
-  GAME_TOKEN_WRONG_SIZE = 'GAME_TOKEN_WRONG_SIZE',
-  NAME_TOO_LONG = 'NAME_TOO_LONG',
-  INVALID_REQUEST = 'INVALID_REQUEST',
-  EMAIL_INVALID = 'EMAIL_INVALID',
-  INVALID_TOKEN_LENGTH = 'INVALID_TOKEN_LENGTH',
-  INVALID_APP_ID = 'INVALID_APP_ID',
-  CHUNK_NOT_FOUND = 'CHUNK_NOT_FOUND',
-  USER_NOT_AUTHENTICATED = 'USER_NOT_AUTHENTICATED',
-  INVALID_STATE_DATA = 'INVALID_STATE_DATA',
-  USER_NOT_APP_ADMIN = 'USER_NOT_APP_ADMIN',
-  GRID_OUTSIDE_ASSIGNMENT = 'GRID_OUTSIDE_ASSIGNMENT',
-  NO_MATCHING_GRID_ASSIGNMENT = 'NO_MATCHING_GRID_ASSIGNMENT',
-  INVALID_GRID_COORDINATES = 'INVALID_GRID_COORDINATES',
-  GRID_ALREADY_EXISTS = 'GRID_ALREADY_EXISTS',
-  GRID_OVERLAPS_EXISTING = 'GRID_OVERLAPS_EXISTING',
-  GAMERTAG_ALREADY_EXISTS = 'GAMERTAG_ALREADY_EXISTS',
-}
+// Error codes - re-exported from the codegen-derived enum so the SDK has
+// exactly one canonical UdpErrorCode shape. The hand-written enum that
+// used to live here drifted from the schema (`AppNotFound` etc.); see
+// generated/graphql.ts for the source of truth.
+export { UdpErrorCode } from './generated/graphql.js';
+import type { UdpErrorCode } from './generated/graphql.js';
 
 // User types
 export interface User {

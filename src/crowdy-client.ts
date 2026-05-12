@@ -30,6 +30,7 @@ import { WorldClient } from './world.js';
 
 import { AuthAPI } from './domains/auth.js';
 import { UsersAPI } from './domains/users.js';
+import { AppsAPI } from './domains/apps.js';
 import { ChunksAPI } from './domains/chunks.js';
 import { VoxelsAPI } from './domains/voxels.js';
 import { ActorsAPI } from './domains/actors.js';
@@ -83,9 +84,10 @@ export class CrowdyClient {
   /** management-api HTTP client. Same `AuthState` as `graphql`. */
   readonly management: GraphQLClient;
 
-  // Identity (management-api).
+  // Identity + catalog (management-api).
   readonly auth: AuthAPI;
   readonly users: UsersAPI;
+  readonly apps: AppsAPI;
 
   // Game (game-api).
   readonly chunks: ChunksAPI;
@@ -134,6 +136,7 @@ export class CrowdyClient {
 
     this.auth = new AuthAPI(this.management, this.session);
     this.users = new UsersAPI(this.management);
+    this.apps = new AppsAPI(this.management);
 
     this.chunks = new ChunksAPI(this.graphql);
     this.voxels = new VoxelsAPI(this.graphql);

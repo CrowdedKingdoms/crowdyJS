@@ -8,6 +8,8 @@ query MyApps {
     visibility
     status
     metadata
+    splitMode
+    gameApiUrl
     createdAt
     updatedAt
     org {
